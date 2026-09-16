@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../main.dart' show AppColors;
 import '../models/kuis_model.dart';
 import '../services/auth_service.dart';
 import '../services/kuis_service.dart';
@@ -24,10 +25,7 @@ class _KuisListScreenState extends State<KuisListScreen> {
   }
 
   Future<void> _load() async {
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
+    setState(() { _loading = true; _error = null; });
     try {
       final list = await KuisService.getAll();
       if (mounted) setState(() => _kuis = list);
@@ -41,75 +39,79 @@ class _KuisListScreenState extends State<KuisListScreen> {
   }
 
   Future<void> _logout() async {
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (_) => AlertDialog(
-        backgroundColor: const Color(0xFF1E293B),
-        title: const Text('Konfirmasi', style: TextStyle(color: Colors.white)),
-        content: const Text('Yakin ingin keluar?',
-            style: TextStyle(color: Colors.white70)),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Batal', style: TextStyle(color: Colors.white54)),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.redAccent),
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Keluar'),
-          ),
-        ],
-      ),
+    final ok = await _showConfirm(
+      title: 'Keluar',
+      content: 'Yakin ingin keluar dari akun?',
+      confirmLabel: 'Keluar',
+      danger: true,
     );
-    if (confirm != true) return;
+    if (ok != true) return;
     await AuthService.logout();
     if (mounted) Navigator.pushReplacementNamed(context, '/login');
   }
 
   Future<void> _deleteKuis(KuisModel k) async {
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (_) => AlertDialog(
-        backgroundColor: const Color(0xFF1E293B),
-        title: const Text('Hapus Kuis', style: TextStyle(color: Colors.white)),
-        content: Text(
-          'Hapus "${k.judulKuis}"? Semua soal di dalamnya juga akan terhapus.',
-          style: const TextStyle(color: Colors.white70),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('Batal', style: TextStyle(color: Colors.white54)),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent),
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('Hapus'),
-          ),
-        ],
-      ),
+    final ok = await _showConfirm(
+      title: 'Hapus Kuis',
+      content:
+          'Hapus "${k.judulKuis}"?\nSemua soal di dalamnya juga akan terhapus.',
+      confirmLabel: 'Hapus',
+      danger: true,
     );
-    if (confirm != true) return;
-
+    if (ok != true) return;
     try {
       await KuisService.delete(k.idKuis);
       _load();
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Kuis berhasil dihapus.')),
-        );
-      }
+      if (mounted) _snack('Kuis berhasil dihapus.');
     } on ApiException catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(e.message)),
-        );
-      }
+      if (mounted) _snack(e.message);
     }
   }
 
-  Future<void> _openCreateKuis() async {
+  Future<bool?> _showConfirm({
+    required String title,
+    required String content,
+    required String confirmLabel,
+    bool danger = false,
+  }) =>
+      showDialog<bool>(
+        context: context,
+        builder: (_) => AlertDialog(
+          backgroundColor: Colors.white,
+          shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16)),
+          title: Text(title,
+              style: const TextStyle(
+                  color: AppColors.primary,
+                  fontWeight: FontWeight.bold)),
+          content: Text(content,
+              style: const TextStyle(
+                  color: AppColors.textSecondary, fontSize: 14)),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Batal',
+                  style: TextStyle(color: AppColors.textSecondary)),
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: danger
+                    ? const Color(0xFFB00020)
+                    : AppColors.primary,
+              ),
+              onPressed: () => Navigator.pop(context, true),
+              child: Text(confirmLabel),
+            ),
+          ],
+        ),
+      );
+
+  void _snack(String msg) {
+    ScaffoldMessenger.of(context)
+        .showSnackBar(SnackBar(content: Text(msg)));
+  }
+
+  Future<void> _openCreate() async {
     final created = await Navigator.push<bool>(
       context,
       MaterialPageRoute(builder: (_) => const KuisFormScreen()),
@@ -120,11 +122,12 @@ class _KuisListScreenState extends State<KuisListScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF0F172A),
+      backgroundColor: AppColors.background,
       appBar: AppBar(
-        backgroundColor: const Color(0xFF1E293B),
-        title: const Text('Daftar Kuis',
-            style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        title: const Text('Kuis Saya',
+            style: TextStyle(
+                color: Colors.white, fontWeight: FontWeight.bold)),
+        backgroundColor: AppColors.primary,
         actions: [
           IconButton(
             icon: const Icon(Icons.logout, color: Colors.white70),
@@ -133,68 +136,39 @@ class _KuisListScreenState extends State<KuisListScreen> {
           ),
         ],
       ),
+      body: _buildBody(),
       floatingActionButton: FloatingActionButton.extended(
-        onPressed: _openCreateKuis,
-        backgroundColor: const Color(0xFF6366F1),
+        onPressed: _openCreate,
+        backgroundColor: AppColors.secondary,
         icon: const Icon(Icons.add, color: Colors.white),
         label: const Text('Buat Kuis',
-            style: TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
+            style: TextStyle(
+                color: Colors.white, fontWeight: FontWeight.w600)),
       ),
-      body: _buildBody(),
     );
   }
 
   Widget _buildBody() {
     if (_loading) {
       return const Center(
-        child: CircularProgressIndicator(color: Color(0xFF6366F1)),
-      );
+          child: CircularProgressIndicator(color: AppColors.secondary));
     }
     if (_error != null) {
-      return Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const Icon(Icons.error_outline, color: Colors.redAccent, size: 48),
-            const SizedBox(height: 12),
-            Text(_error!,
-                style: const TextStyle(color: Colors.white70),
-                textAlign: TextAlign.center),
-            const SizedBox(height: 16),
-            ElevatedButton.icon(
-              onPressed: _load,
-              icon: const Icon(Icons.refresh),
-              label: const Text('Coba Lagi'),
-              style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF6366F1)),
-            ),
-          ],
-        ),
-      );
+      return _ErrorState(message: _error!, onRetry: _load);
     }
     if (_kuis.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(Icons.quiz_outlined, size: 64, color: Colors.white24),
-            const SizedBox(height: 12),
-            const Text('Belum ada kuis.',
-                style: TextStyle(color: Colors.white54, fontSize: 16)),
-            const SizedBox(height: 8),
-            const Text('Tekan tombol + untuk membuat kuis baru.',
-                style: TextStyle(color: Colors.white38, fontSize: 13)),
-          ],
-        ),
+      return _EmptyState(
+        icon: Icons.quiz_outlined,
+        title: 'Belum ada kuis',
+        subtitle: 'Tekan tombol "Buat Kuis" untuk memulai.',
       );
     }
 
     return RefreshIndicator(
       onRefresh: _load,
-      color: const Color(0xFF6366F1),
-      backgroundColor: const Color(0xFF1E293B),
+      color: AppColors.secondary,
       child: ListView.builder(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
+        padding: const EdgeInsets.fromLTRB(16, 20, 16, 100),
         itemCount: _kuis.length,
         itemBuilder: (_, i) => _KuisCard(
           kuis: _kuis[i],
@@ -213,7 +187,7 @@ class _KuisListScreenState extends State<KuisListScreen> {
   }
 }
 
-// ─── Card widget ─────────────────────────────────────────────────────────────
+// ─── Kuis Card ────────────────────────────────────────────────────────────────
 
 class _KuisCard extends StatelessWidget {
   final KuisModel kuis;
@@ -228,71 +202,108 @@ class _KuisCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final isPublished = kuis.isPublished;
-
-    return Card(
-      color: const Color(0xFF1E293B),
-      margin: const EdgeInsets.only(bottom: 12),
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+    return Container(
+      margin: const EdgeInsets.only(bottom: 14),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.cardBorder),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.primary.withValues(alpha: 0.05),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
       child: InkWell(
         borderRadius: BorderRadius.circular(14),
         onTap: onTap,
         child: Padding(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(18),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // Baris atas: judul + status + delete
               Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Expanded(
                     child: Text(
                       kuis.judulKuis,
                       style: const TextStyle(
-                        color: Colors.white,
+                        color: AppColors.primary,
                         fontSize: 16,
-                        fontWeight: FontWeight.w600,
+                        fontWeight: FontWeight.bold,
                       ),
                     ),
                   ),
                   const SizedBox(width: 8),
-                  _StatusChip(isPublished: isPublished),
+                  _StatusBadge(status: kuis.status),
                   const SizedBox(width: 4),
-                  IconButton(
-                    icon: const Icon(Icons.delete_outline,
-                        color: Colors.redAccent, size: 20),
-                    tooltip: 'Hapus kuis',
-                    constraints: const BoxConstraints(),
-                    padding: EdgeInsets.zero,
-                    onPressed: onDelete,
+                  GestureDetector(
+                    onTap: onDelete,
+                    child: const Padding(
+                      padding: EdgeInsets.only(left: 4),
+                      child: Icon(Icons.delete_outline,
+                          color: Color(0xFFB00020), size: 20),
+                    ),
                   ),
                 ],
               ),
+
+              // Materi
               if (kuis.materi != null) ...[
                 const SizedBox(height: 6),
                 Row(
                   children: [
                     const Icon(Icons.book_outlined,
-                        size: 14, color: Colors.white38),
+                        size: 13, color: AppColors.textHint),
                     const SizedBox(width: 4),
-                    Text(
-                      kuis.materi!.judulMateri,
-                      style: const TextStyle(
-                          color: Colors.white54, fontSize: 12),
-                    ),
+                    Text(kuis.materi!.judulMateri,
+                        style: const TextStyle(
+                            color: AppColors.textSecondary,
+                            fontSize: 12)),
                   ],
                 ),
               ],
+
+              if (kuis.deskripsi != null &&
+                  kuis.deskripsi!.isNotEmpty) ...[
+                const SizedBox(height: 6),
+                Text(
+                  kuis.deskripsi!,
+                  style: const TextStyle(
+                      color: AppColors.textHint, fontSize: 12),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ],
+
+              const SizedBox(height: 14),
+              const Divider(height: 1, color: AppColors.divider),
               const SizedBox(height: 12),
+
+              // Info bawah
               Row(
                 children: [
-                  _InfoChip(
+                  _InfoPill(
                     icon: Icons.help_outline,
-                    label: '${kuis.jumlahSoal} soal',
+                    label: '${kuis.jumlahSoal} Soal',
                   ),
                   const SizedBox(width: 8),
-                  _InfoChip(
+                  _InfoPill(
                     icon: Icons.check_circle_outline,
                     label: 'KKM ${kuis.batasLulus}%',
+                  ),
+                  const Spacer(),
+                  Text(
+                    'Lihat soal →',
+                    style: TextStyle(
+                      color: AppColors.secondary,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ],
               ),
@@ -304,55 +315,134 @@ class _KuisCard extends StatelessWidget {
   }
 }
 
-class _StatusChip extends StatelessWidget {
-  final bool isPublished;
-  const _StatusChip({required this.isPublished});
+// ─── Widgets pendukung ────────────────────────────────────────────────────────
+
+class _StatusBadge extends StatelessWidget {
+  final String status;
+  const _StatusBadge({required this.status});
 
   @override
   Widget build(BuildContext context) {
+    final isPublished = status == 'published';
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
         color: isPublished
-            ? Colors.green.shade800.withValues(alpha: 0.4)
-            : Colors.orange.shade800.withValues(alpha: 0.4),
+            ? const Color(0xFFE8F5E9)
+            : const Color(0xFFFFF8E1),
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
-          color: isPublished ? Colors.green.shade600 : Colors.orange.shade600,
+          color: isPublished
+              ? const Color(0xFF81C784)
+              : const Color(0xFFFFCC02),
         ),
       ),
       child: Text(
         isPublished ? 'Published' : 'Draft',
         style: TextStyle(
-          color: isPublished ? Colors.greenAccent : Colors.orangeAccent,
+          color: isPublished
+              ? const Color(0xFF2E7D32)
+              : const Color(0xFFF57F17),
           fontSize: 11,
-          fontWeight: FontWeight.w600,
+          fontWeight: FontWeight.w700,
         ),
       ),
     );
   }
 }
 
-class _InfoChip extends StatelessWidget {
+class _InfoPill extends StatelessWidget {
   final IconData icon;
   final String label;
-  const _InfoChip({required this.icon, required this.label});
+  const _InfoPill({required this.icon, required this.label});
 
   @override
   Widget build(BuildContext context) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
-        color: const Color(0xFF0F172A),
+        color: AppColors.background,
         borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: AppColors.cardBorder),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 13, color: Colors.white38),
+          Icon(icon, size: 13, color: AppColors.textSecondary),
           const SizedBox(width: 4),
           Text(label,
-              style: const TextStyle(color: Colors.white54, fontSize: 12)),
+              style: const TextStyle(
+                  color: AppColors.textSecondary, fontSize: 12)),
+        ],
+      ),
+    );
+  }
+}
+
+// ─── State widgets ────────────────────────────────────────────────────────────
+
+class _EmptyState extends StatelessWidget {
+  final IconData icon;
+  final String title;
+  final String subtitle;
+  const _EmptyState(
+      {required this.icon, required this.title, required this.subtitle});
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 72,
+            height: 72,
+            decoration: BoxDecoration(
+              color: AppColors.accent.withValues(alpha: 0.4),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Icon(icon, size: 36, color: AppColors.textSecondary),
+          ),
+          const SizedBox(height: 16),
+          Text(title,
+              style: const TextStyle(
+                  color: AppColors.primary,
+                  fontSize: 17,
+                  fontWeight: FontWeight.bold)),
+          const SizedBox(height: 6),
+          Text(subtitle,
+              style: const TextStyle(
+                  color: AppColors.textSecondary, fontSize: 13)),
+        ],
+      ),
+    );
+  }
+}
+
+class _ErrorState extends StatelessWidget {
+  final String message;
+  final VoidCallback onRetry;
+  const _ErrorState({required this.message, required this.onRetry});
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const Icon(Icons.wifi_off_rounded,
+              color: AppColors.textHint, size: 48),
+          const SizedBox(height: 12),
+          Text(message,
+              style: const TextStyle(
+                  color: AppColors.textSecondary, fontSize: 14),
+              textAlign: TextAlign.center),
+          const SizedBox(height: 16),
+          ElevatedButton.icon(
+            onPressed: onRetry,
+            icon: const Icon(Icons.refresh, size: 18),
+            label: const Text('Coba Lagi'),
+          ),
         ],
       ),
     );

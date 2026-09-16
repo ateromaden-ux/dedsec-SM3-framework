@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../main.dart' show AppColors;
 import '../models/kuis_model.dart';
 import '../models/soal_model.dart';
 import '../services/kuis_service.dart';
@@ -28,15 +29,12 @@ class _KuisDetailScreenState extends State<KuisDetailScreen> {
   }
 
   Future<void> _load() async {
-    setState(() {
-      _loading = true;
-      _error = null;
-    });
+    setState(() { _loading = true; _error = null; });
     try {
       final detail = await KuisService.getDetail(_kuis.idKuis);
       if (mounted) {
         setState(() {
-          _kuis = detail;
+          _kuis     = detail;
           _soalList = detail.soal;
         });
       }
@@ -52,42 +50,30 @@ class _KuisDetailScreenState extends State<KuisDetailScreen> {
   Future<void> _toggleStatus() async {
     final newStatus = _kuis.isDraft ? 'published' : 'draft';
     try {
-      final updated =
-          await KuisService.update(_kuis.idKuis, status: newStatus);
-      if (mounted) setState(() => _kuis = updated);
+      final updated = await KuisService.update(_kuis.idKuis, status: newStatus);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              newStatus == 'published'
-                  ? 'Kuis dipublikasikan.'
-                  : 'Kuis dikembalikan ke draft.',
-            ),
-          ),
-        );
+        setState(() => _kuis = updated);
+        _snack(newStatus == 'published'
+            ? 'Kuis dipublikasikan.'
+            : 'Kuis dikembalikan ke draft.');
       }
     } on ApiException catch (e) {
-      if (mounted) _showError(e.message);
+      if (mounted) _snack(e.message);
     }
   }
 
   Future<void> _deleteSoal(SoalModel soal) async {
-    final confirm = await _confirmDialog(
+    final ok = await _confirm(
       title: 'Hapus Soal',
-      content:
-          'Hapus soal "${_truncate(soal.pertanyaan, 60)}"? Tindakan ini tidak bisa dibatalkan.',
+      content: 'Soal ini beserta semua pilihan jawabannya akan dihapus permanen.',
     );
-    if (confirm != true) return;
-
+    if (ok != true) return;
     try {
       await SoalService.delete(_kuis.idKuis, soal.idSoal!);
       _load();
-      if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(const SnackBar(content: Text('Soal dihapus.')));
-      }
+      if (mounted) _snack('Soal berhasil dihapus.');
     } on ApiException catch (e) {
-      if (mounted) _showError(e.message);
+      if (mounted) _snack(e.message);
     }
   }
 
@@ -101,29 +87,28 @@ class _KuisDetailScreenState extends State<KuisDetailScreen> {
     if (saved == true) _load();
   }
 
-  void _showError(String msg) {
-    ScaffoldMessenger.of(context)
-        .showSnackBar(SnackBar(content: Text(msg)));
-  }
-
-  Future<bool?> _confirmDialog(
-          {required String title, required String content}) =>
+  Future<bool?> _confirm({required String title, required String content}) =>
       showDialog<bool>(
         context: context,
         builder: (_) => AlertDialog(
-          backgroundColor: const Color(0xFF1E293B),
-          title: Text(title, style: const TextStyle(color: Colors.white)),
-          content:
-              Text(content, style: const TextStyle(color: Colors.white70)),
+          backgroundColor: Colors.white,
+          shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16)),
+          title: Text(title,
+              style: const TextStyle(
+                  color: AppColors.primary, fontWeight: FontWeight.bold)),
+          content: Text(content,
+              style: const TextStyle(
+                  color: AppColors.textSecondary, fontSize: 14)),
           actions: [
             TextButton(
               onPressed: () => Navigator.pop(context, false),
               child: const Text('Batal',
-                  style: TextStyle(color: Colors.white54)),
+                  style: TextStyle(color: AppColors.textSecondary)),
             ),
             ElevatedButton(
               style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.redAccent),
+                  backgroundColor: const Color(0xFFB00020)),
               onPressed: () => Navigator.pop(context, true),
               child: const Text('Hapus'),
             ),
@@ -131,58 +116,71 @@ class _KuisDetailScreenState extends State<KuisDetailScreen> {
         ),
       );
 
-  String _truncate(String s, int max) =>
-      s.length > max ? '${s.substring(0, max)}…' : s;
+  void _snack(String msg) => ScaffoldMessenger.of(context)
+      .showSnackBar(SnackBar(content: Text(msg)));
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF0F172A),
+      backgroundColor: AppColors.background,
       appBar: AppBar(
-        backgroundColor: const Color(0xFF1E293B),
+        backgroundColor: AppColors.primary,
         iconTheme: const IconThemeData(color: Colors.white),
         title: Text(
           _kuis.judulKuis,
           style: const TextStyle(
-              color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
+              fontSize: 16),
           overflow: TextOverflow.ellipsis,
         ),
         actions: [
-          // Toggle status
-          TextButton.icon(
-            onPressed: _toggleStatus,
-            icon: Icon(
-              _kuis.isDraft
-                  ? Icons.publish_rounded
-                  : Icons.unpublished_outlined,
-              size: 18,
-              color:
-                  _kuis.isDraft ? Colors.greenAccent : Colors.orangeAccent,
-            ),
-            label: Text(
-              _kuis.isDraft ? 'Publish' : 'Draft',
-              style: TextStyle(
-                color:
-                    _kuis.isDraft ? Colors.greenAccent : Colors.orangeAccent,
-                fontSize: 13,
+          // Tombol publish / draft
+          Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: TextButton.icon(
+              onPressed: _toggleStatus,
+              icon: Icon(
+                _kuis.isDraft
+                    ? Icons.publish_rounded
+                    : Icons.unpublished_outlined,
+                size: 16,
+                color: _kuis.isDraft
+                    ? const Color(0xFF81C784)
+                    : const Color(0xFFFFCC02),
+              ),
+              label: Text(
+                _kuis.isDraft ? 'Publish' : 'Draft',
+                style: TextStyle(
+                  color: _kuis.isDraft
+                      ? const Color(0xFF81C784)
+                      : const Color(0xFFFFCC02),
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
             ),
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        onPressed: () => _openSoalForm(),
-        backgroundColor: const Color(0xFF6366F1),
-        icon: const Icon(Icons.add, color: Colors.white),
-        label: const Text('Tambah Soal',
-            style:
-                TextStyle(color: Colors.white, fontWeight: FontWeight.w600)),
-      ),
       body: Column(
         children: [
-          _KuisInfoHeader(kuis: _kuis),
+          // ── Info header kuis ─────────────────────────────────────────────
+          _KuisHeader(kuis: _kuis),
+
+          // ── Daftar soal ──────────────────────────────────────────────────
           Expanded(child: _buildBody()),
         ],
+      ),
+
+      // ── FAB tambah soal ──────────────────────────────────────────────────
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () => _openSoalForm(),
+        backgroundColor: AppColors.secondary,
+        icon: const Icon(Icons.add, color: Colors.white),
+        label: const Text('Tambah Soal',
+            style: TextStyle(
+                color: Colors.white, fontWeight: FontWeight.w600)),
       ),
     );
   }
@@ -190,25 +188,24 @@ class _KuisDetailScreenState extends State<KuisDetailScreen> {
   Widget _buildBody() {
     if (_loading) {
       return const Center(
-          child: CircularProgressIndicator(color: Color(0xFF6366F1)));
+          child: CircularProgressIndicator(color: AppColors.secondary));
     }
     if (_error != null) {
       return Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.error_outline, color: Colors.redAccent, size: 44),
+            const Icon(Icons.wifi_off_rounded,
+                color: AppColors.textHint, size: 44),
             const SizedBox(height: 10),
             Text(_error!,
-                style: const TextStyle(color: Colors.white70),
+                style: const TextStyle(color: AppColors.textSecondary),
                 textAlign: TextAlign.center),
             const SizedBox(height: 14),
             ElevatedButton.icon(
               onPressed: _load,
-              icon: const Icon(Icons.refresh),
+              icon: const Icon(Icons.refresh, size: 18),
               label: const Text('Coba Lagi'),
-              style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFF6366F1)),
             ),
           ],
         ),
@@ -219,13 +216,26 @@ class _KuisDetailScreenState extends State<KuisDetailScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Icon(Icons.help_outline, size: 60, color: Colors.white24),
-            const SizedBox(height: 12),
-            const Text('Belum ada soal.',
-                style: TextStyle(color: Colors.white54, fontSize: 16)),
+            Container(
+              width: 72,
+              height: 72,
+              decoration: BoxDecoration(
+                color: AppColors.accent.withValues(alpha: 0.4),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: const Icon(Icons.help_outline,
+                  size: 36, color: AppColors.textSecondary),
+            ),
+            const SizedBox(height: 16),
+            const Text('Belum ada soal',
+                style: TextStyle(
+                    color: AppColors.primary,
+                    fontSize: 17,
+                    fontWeight: FontWeight.bold)),
             const SizedBox(height: 6),
-            const Text('Tekan tombol + untuk menambah soal.',
-                style: TextStyle(color: Colors.white38, fontSize: 13)),
+            const Text('Tekan tombol "+ Tambah Soal" untuk mulai.',
+                style: TextStyle(
+                    color: AppColors.textSecondary, fontSize: 13)),
           ],
         ),
       );
@@ -233,10 +243,9 @@ class _KuisDetailScreenState extends State<KuisDetailScreen> {
 
     return RefreshIndicator(
       onRefresh: _load,
-      color: const Color(0xFF6366F1),
-      backgroundColor: const Color(0xFF1E293B),
+      color: AppColors.secondary,
       child: ListView.builder(
-        padding: const EdgeInsets.fromLTRB(16, 12, 16, 100),
+        padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
         itemCount: _soalList.length,
         itemBuilder: (_, i) => _SoalCard(
           soal: _soalList[i],
@@ -251,48 +260,43 @@ class _KuisDetailScreenState extends State<KuisDetailScreen> {
 
 // ─── Header info kuis ─────────────────────────────────────────────────────────
 
-class _KuisInfoHeader extends StatelessWidget {
+class _KuisHeader extends StatelessWidget {
   final KuisModel kuis;
-  const _KuisInfoHeader({required this.kuis});
+  const _KuisHeader({required this.kuis});
 
   @override
   Widget build(BuildContext context) {
     return Container(
+      color: AppColors.secondary,
       padding: const EdgeInsets.fromLTRB(16, 12, 16, 14),
-      color: const Color(0xFF1E293B),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           if (kuis.deskripsi != null && kuis.deskripsi!.isNotEmpty) ...[
             Text(
               kuis.deskripsi!,
-              style:
-                  const TextStyle(color: Colors.white60, fontSize: 13),
+              style: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.8),
+                  fontSize: 13),
               maxLines: 2,
               overflow: TextOverflow.ellipsis,
             ),
             const SizedBox(height: 10),
           ],
-          Row(
+          Wrap(
+            spacing: 8,
+            runSpacing: 6,
             children: [
               if (kuis.materi != null)
-                _Chip(
-                  icon: Icons.book_outlined,
-                  label: kuis.materi!.judulMateri,
-                  color: const Color(0xFF6366F1),
-                ),
-              const SizedBox(width: 8),
-              _Chip(
-                icon: Icons.help_outline,
-                label: '${kuis.jumlahSoal} soal',
-                color: Colors.blueGrey,
-              ),
-              const SizedBox(width: 8),
-              _Chip(
-                icon: Icons.check_circle_outline,
-                label: 'KKM ${kuis.batasLulus}%',
-                color: Colors.teal,
-              ),
+                _HeaderChip(
+                    icon: Icons.book_outlined,
+                    label: kuis.materi!.judulMateri),
+              _HeaderChip(
+                  icon: Icons.help_outline,
+                  label: '${kuis.jumlahSoal} Soal'),
+              _HeaderChip(
+                  icon: Icons.check_circle_outline,
+                  label: 'KKM ${kuis.batasLulus}%'),
             ],
           ),
         ],
@@ -301,36 +305,35 @@ class _KuisInfoHeader extends StatelessWidget {
   }
 }
 
-class _Chip extends StatelessWidget {
+class _HeaderChip extends StatelessWidget {
   final IconData icon;
   final String label;
-  final Color color;
-  const _Chip({required this.icon, required this.label, required this.color});
+  const _HeaderChip({required this.icon, required this.label});
 
   @override
   Widget build(BuildContext context) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.15),
+        color: Colors.white.withValues(alpha: 0.15),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: color.withValues(alpha: 0.4)),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 13, color: color),
+          Icon(icon, size: 13, color: Colors.white70),
           const SizedBox(width: 4),
-          Text(label, style: TextStyle(color: color, fontSize: 12)),
+          Text(label,
+              style: const TextStyle(color: Colors.white, fontSize: 12)),
         ],
       ),
     );
   }
 }
 
-// ─── Soal card ────────────────────────────────────────────────────────────────
+// ─── Soal Card — selalu tampil semua pilihan jawaban ─────────────────────────
 
-class _SoalCard extends StatefulWidget {
+class _SoalCard extends StatelessWidget {
   final SoalModel soal;
   final int nomor;
   final VoidCallback onEdit;
@@ -344,217 +347,266 @@ class _SoalCard extends StatefulWidget {
   });
 
   @override
-  State<_SoalCard> createState() => _SoalCardState();
-}
-
-class _SoalCardState extends State<_SoalCard> {
-  bool _expanded = false;
-
-  @override
   Widget build(BuildContext context) {
-    final soal = widget.soal;
     final correctIdx = soal.correctAnswerIndex;
 
-    return Card(
-      color: const Color(0xFF1E293B),
-      margin: const EdgeInsets.only(bottom: 12),
-      shape:
-          RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppColors.cardBorder),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.primary.withValues(alpha: 0.04),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Header soal
-          InkWell(
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(14)),
-            onTap: () => setState(() => _expanded = !_expanded),
-            child: Padding(
-              padding: const EdgeInsets.all(14),
-              child: Row(
-                children: [
-                  // Nomor
-                  Container(
-                    width: 32,
-                    height: 32,
-                    decoration: BoxDecoration(
-                      color: const Color(0xFF6366F1).withValues(alpha: 0.2),
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    alignment: Alignment.center,
-                    child: Text(
-                      '${widget.nomor}',
-                      style: const TextStyle(
-                        color: Color(0xFF6366F1),
-                        fontWeight: FontWeight.bold,
-                        fontSize: 14,
-                      ),
+          // ── Header soal ────────────────────────────────────────────────
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 14, 12, 10),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // Nomor soal
+                Container(
+                  width: 30,
+                  height: 30,
+                  margin: const EdgeInsets.only(top: 1, right: 12),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary,
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  alignment: Alignment.center,
+                  child: Text(
+                    '$nomor',
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 13,
                     ),
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          soal.pertanyaan,
-                          style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 14,
-                              fontWeight: FontWeight.w500),
-                          maxLines: _expanded ? null : 2,
-                          overflow: _expanded
-                              ? TextOverflow.visible
-                              : TextOverflow.ellipsis,
-                        ),
-                        const SizedBox(height: 4),
-                        Row(
-                          children: [
-                            const Icon(Icons.star_outline,
-                                size: 13, color: Colors.amber),
-                            const SizedBox(width: 3),
-                            Text(
-                              '${soal.poin} poin',
-                              style: const TextStyle(
-                                  color: Colors.amber, fontSize: 12),
-                            ),
-                            const SizedBox(width: 10),
-                            const Icon(Icons.format_list_bulleted,
-                                size: 13, color: Colors.white38),
-                            const SizedBox(width: 3),
-                            Text(
-                              '${soal.pilihanJawaban.length} pilihan',
-                              style: const TextStyle(
-                                  color: Colors.white38, fontSize: 12),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                  // Actions
-                  Row(
-                    mainAxisSize: MainAxisSize.min,
+                ),
+                // Pertanyaan
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      IconButton(
-                        icon: const Icon(Icons.edit_outlined,
-                            color: Color(0xFF6366F1), size: 19),
-                        tooltip: 'Edit soal',
-                        onPressed: widget.onEdit,
-                        constraints: const BoxConstraints(),
-                        padding: const EdgeInsets.all(6),
+                      Text(
+                        soal.pertanyaan,
+                        style: const TextStyle(
+                          color: AppColors.primary,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                          height: 1.4,
+                        ),
                       ),
-                      IconButton(
-                        icon: const Icon(Icons.delete_outline,
-                            color: Colors.redAccent, size: 19),
-                        tooltip: 'Hapus soal',
-                        onPressed: widget.onDelete,
-                        constraints: const BoxConstraints(),
-                        padding: const EdgeInsets.all(6),
-                      ),
-                      Icon(
-                        _expanded
-                            ? Icons.keyboard_arrow_up
-                            : Icons.keyboard_arrow_down,
-                        color: Colors.white38,
-                        size: 20,
+                      const SizedBox(height: 4),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: AppColors.accent.withValues(alpha: 0.4),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(
+                          '${soal.poin} poin',
+                          style: const TextStyle(
+                            color: AppColors.textSecondary,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
                       ),
                     ],
                   ),
-                ],
-              ),
+                ),
+                // Tombol EDIT & HAPUS
+                Column(
+                  children: [
+                    _ActionBtn(
+                      label: 'Edit',
+                      icon: Icons.edit_outlined,
+                      color: AppColors.secondary,
+                      onTap: onEdit,
+                    ),
+                    const SizedBox(height: 6),
+                    _ActionBtn(
+                      label: 'Hapus',
+                      icon: Icons.delete_outline,
+                      color: const Color(0xFFB00020),
+                      onTap: onDelete,
+                    ),
+                  ],
+                ),
+              ],
             ),
           ),
 
-          // Pilihan jawaban (expand)
-          if (_expanded && soal.pilihanJawaban.isNotEmpty) ...[
-            const Divider(
-                height: 1, color: Color(0xFF0F172A), thickness: 1),
-            Padding(
-              padding:
-                  const EdgeInsets.fromLTRB(14, 10, 14, 14),
-              child: Column(
-                children: soal.pilihanJawaban.asMap().entries.map((e) {
-                  final idx = e.key;
-                  final p = e.value;
-                  final isCorrect = idx == correctIdx;
+          const Divider(height: 1, color: AppColors.divider),
 
-                  return Container(
-                    margin: const EdgeInsets.only(bottom: 8),
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 12, vertical: 10),
-                    decoration: BoxDecoration(
+          // ── Pilihan jawaban ─────────────────────────────────────────────
+          Padding(
+            padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
+            child: Column(
+              children: soal.pilihanJawaban.asMap().entries.map((e) {
+                final idx = e.key;
+                final p   = e.value;
+                final isCorrect = idx == correctIdx;
+
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 8),
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: isCorrect
+                        ? const Color(0xFFE8F5E9)
+                        : AppColors.background,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
                       color: isCorrect
-                          ? Colors.green.shade900.withValues(alpha: 0.35)
-                          : const Color(0xFF0F172A),
-                      borderRadius: BorderRadius.circular(10),
-                      border: Border.all(
-                        color: isCorrect
-                            ? Colors.green.shade600
-                            : Colors.white12,
-                      ),
+                          ? const Color(0xFF81C784)
+                          : AppColors.cardBorder,
+                      width: isCorrect ? 1.5 : 1,
                     ),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Container(
-                          width: 26,
-                          height: 26,
-                          decoration: BoxDecoration(
-                            color: isCorrect
-                                ? Colors.green.shade700
-                                : const Color(0xFF1E293B),
-                            shape: BoxShape.circle,
-                          ),
-                          alignment: Alignment.center,
-                          child: Text(
-                            p.labelPilihan,
-                            style: TextStyle(
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          // Label A/B/C/D
+                          Container(
+                            width: 28,
+                            height: 28,
+                            margin: const EdgeInsets.only(right: 10),
+                            decoration: BoxDecoration(
                               color: isCorrect
-                                  ? Colors.white
-                                  : Colors.white54,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 12,
+                                  ? const Color(0xFF2E7D32)
+                                  : AppColors.accent
+                                      .withValues(alpha: 0.5),
+                              shape: BoxShape.circle,
+                            ),
+                            alignment: Alignment.center,
+                            child: Text(
+                              p.labelPilihan,
+                              style: TextStyle(
+                                color: isCorrect
+                                    ? Colors.white
+                                    : AppColors.textPrimary,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 12,
+                              ),
                             ),
                           ),
-                        ),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment:
-                                CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                p.isiPilihan,
-                                style: TextStyle(
-                                  color: isCorrect
-                                      ? Colors.white
-                                      : Colors.white70,
-                                  fontSize: 13,
-                                ),
+                          Expanded(
+                            child: Text(
+                              p.isiPilihan,
+                              style: TextStyle(
+                                color: isCorrect
+                                    ? const Color(0xFF1B5E20)
+                                    : AppColors.textPrimary,
+                                fontSize: 13,
+                                fontWeight: isCorrect
+                                    ? FontWeight.w600
+                                    : FontWeight.normal,
                               ),
-                              if (p.penjelasan.isNotEmpty) ...[
-                                const SizedBox(height: 4),
-                                Text(
-                                  'Penjelasan: ${p.penjelasan}',
+                            ),
+                          ),
+                          if (isCorrect)
+                            const Icon(Icons.check_circle,
+                                color: Color(0xFF2E7D32), size: 18),
+                        ],
+                      ),
+                      // Penjelasan
+                      if (p.penjelasan.isNotEmpty) ...[
+                        const SizedBox(height: 8),
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 10, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: isCorrect
+                                ? Colors.white.withValues(alpha: 0.7)
+                                : Colors.white,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Icon(Icons.lightbulb_outline,
+                                  size: 13,
+                                  color: AppColors.textSecondary),
+                              const SizedBox(width: 6),
+                              Expanded(
+                                child: Text(
+                                  p.penjelasan,
                                   style: const TextStyle(
-                                    color: Colors.white38,
-                                    fontSize: 11,
+                                    color: AppColors.textSecondary,
+                                    fontSize: 12,
                                     fontStyle: FontStyle.italic,
                                   ),
                                 ),
-                              ],
+                              ),
                             ],
                           ),
                         ),
-                        if (isCorrect)
-                          const Icon(Icons.check_circle,
-                              color: Colors.greenAccent, size: 18),
                       ],
-                    ),
-                  );
-                }).toList(),
-              ),
+                    ],
+                  ),
+                );
+              }).toList(),
             ),
-          ],
+          ),
         ],
+      ),
+    );
+  }
+}
+
+// ─── Tombol aksi kecil ────────────────────────────────────────────────────────
+
+class _ActionBtn extends StatelessWidget {
+  final String label;
+  final IconData icon;
+  final Color color;
+  final VoidCallback onTap;
+
+  const _ActionBtn({
+    required this.label,
+    required this.icon,
+    required this.color,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.1),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(color: color.withValues(alpha: 0.3)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(icon, size: 13, color: color),
+            const SizedBox(width: 4),
+            Text(label,
+                style: TextStyle(
+                    color: color,
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600)),
+          ],
+        ),
       ),
     );
   }

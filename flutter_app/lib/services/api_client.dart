@@ -1,5 +1,4 @@
 import 'dart:convert';
-import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -13,10 +12,7 @@ class ApiException implements Exception {
 }
 
 class ApiClient {
-  // Ganti sesuai IP/domain Laravel kamu.
-  // Emulator Android: 10.0.2.2  |  Device fisik: IP lokal misal 192.168.x.x
   static const String baseUrl = 'http://localhost/Project-DedSec/public/api';
-
   static const String _tokenKey = 'api_token';
 
   // ── Token helpers ──────────────────────────────────────────────────────────
@@ -38,7 +34,7 @@ class ApiClient {
 
   static Future<bool> isLoggedIn() async => (await getToken()) != null;
 
-  // ── Request helpers ────────────────────────────────────────────────────────
+  // ── Headers ────────────────────────────────────────────────────────────────
 
   static Future<Map<String, String>> _headers({bool auth = true}) async {
     final headers = <String, String>{
@@ -52,24 +48,43 @@ class ApiClient {
     return headers;
   }
 
-  static Map<String, dynamic> _handleResponse(http.Response response) {
-    final body = utf8.decode(response.bodyBytes);
-    late Map<String, dynamic> json;
+  // ── Response handler ───────────────────────────────────────────────────────
+
+  static Map<String, dynamic> _handle(http.Response res) {
+    final body = utf8.decode(res.bodyBytes);
+
+    // Coba decode JSON
+    Map<String, dynamic> json;
     try {
       json = jsonDecode(body) as Map<String, dynamic>;
     } catch (_) {
-      throw ApiException(response.statusCode, 'Respons tidak valid dari server.');
+      // Bukan JSON — kembalikan raw body sebagai pesan error
+      throw ApiException(
+        res.statusCode,
+        'Server mengembalikan respons tidak valid (${res.statusCode}):\n$body',
+      );
     }
 
-    if (response.statusCode >= 200 && response.statusCode < 300) {
-      return json;
+    if (res.statusCode >= 200 && res.statusCode < 300) return json;
+
+    // Ambil pesan error dari berbagai format Laravel response
+    String message;
+    if (json['errors'] != null) {
+      // Validation errors — gabungkan semua field
+      final errors = json['errors'] as Map<String, dynamic>;
+      message = errors.entries
+          .map((e) {
+            final msgs = e.value is List
+                ? (e.value as List).join(', ')
+                : e.value.toString();
+            return '${e.key}: $msgs';
+          })
+          .join('\n');
+    } else {
+      message = json['message'] as String? ?? 'Error ${res.statusCode}';
     }
 
-    final message = json['message'] as String? ??
-        (json['errors'] != null
-            ? (json['errors'] as Map).values.first.toString()
-            : 'Terjadi kesalahan.');
-    throw ApiException(response.statusCode, message);
+    throw ApiException(res.statusCode, message);
   }
 
   // ── HTTP verbs ─────────────────────────────────────────────────────────────
@@ -79,13 +94,14 @@ class ApiClient {
     bool auth = true,
   }) async {
     try {
-      final res = await http.get(
-        Uri.parse('$baseUrl$path'),
-        headers: await _headers(auth: auth),
-      );
-      return _handleResponse(res);
-    } on SocketException {
-      throw const ApiException(0, 'Tidak dapat terhubung ke server. Periksa koneksi internet.');
+      final res = await http
+          .get(Uri.parse('$baseUrl$path'), headers: await _headers(auth: auth))
+          .timeout(const Duration(seconds: 30));
+      return _handle(res);
+    } on ApiException {
+      rethrow;
+    } catch (e) {
+      throw ApiException(0, 'Gagal terhubung ke server: $e');
     }
   }
 
@@ -95,14 +111,18 @@ class ApiClient {
     bool auth = true,
   }) async {
     try {
-      final res = await http.post(
-        Uri.parse('$baseUrl$path'),
-        headers: await _headers(auth: auth),
-        body: jsonEncode(body),
-      );
-      return _handleResponse(res);
-    } on SocketException {
-      throw const ApiException(0, 'Tidak dapat terhubung ke server. Periksa koneksi internet.');
+      final res = await http
+          .post(
+            Uri.parse('$baseUrl$path'),
+            headers: await _headers(auth: auth),
+            body: jsonEncode(body),
+          )
+          .timeout(const Duration(seconds: 30));
+      return _handle(res);
+    } on ApiException {
+      rethrow;
+    } catch (e) {
+      throw ApiException(0, 'Gagal terhubung ke server: $e');
     }
   }
 
@@ -111,26 +131,31 @@ class ApiClient {
     Map<String, dynamic> body,
   ) async {
     try {
-      final res = await http.put(
-        Uri.parse('$baseUrl$path'),
-        headers: await _headers(),
-        body: jsonEncode(body),
-      );
-      return _handleResponse(res);
-    } on SocketException {
-      throw const ApiException(0, 'Tidak dapat terhubung ke server. Periksa koneksi internet.');
+      final res = await http
+          .put(
+            Uri.parse('$baseUrl$path'),
+            headers: await _headers(),
+            body: jsonEncode(body),
+          )
+          .timeout(const Duration(seconds: 30));
+      return _handle(res);
+    } on ApiException {
+      rethrow;
+    } catch (e) {
+      throw ApiException(0, 'Gagal terhubung ke server: $e');
     }
   }
 
   static Future<Map<String, dynamic>> delete(String path) async {
     try {
-      final res = await http.delete(
-        Uri.parse('$baseUrl$path'),
-        headers: await _headers(),
-      );
-      return _handleResponse(res);
-    } on SocketException {
-      throw const ApiException(0, 'Tidak dapat terhubung ke server. Periksa koneksi internet.');
+      final res = await http
+          .delete(Uri.parse('$baseUrl$path'), headers: await _headers())
+          .timeout(const Duration(seconds: 30));
+      return _handle(res);
+    } on ApiException {
+      rethrow;
+    } catch (e) {
+      throw ApiException(0, 'Gagal terhubung ke server: $e');
     }
   }
 }

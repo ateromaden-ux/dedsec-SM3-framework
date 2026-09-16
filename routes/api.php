@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\AuthApiController;
+use App\Http\Controllers\Api\DebugApiController;
 use App\Http\Controllers\Api\KuisApiController;
 use App\Http\Controllers\Api\SoalApiController;
 use App\Http\Middleware\ApiTokenAuth;
@@ -16,6 +17,13 @@ use Illuminate\Support\Facades\Route;
 
 // Public: Login
 Route::post('/auth/login', [AuthApiController::class, 'login']);
+
+// Debug (hapus setelah selesai)
+Route::get('/debug/status',      [DebugApiController::class, 'status']);
+Route::get('/debug/test-kuis',   [DebugApiController::class, 'testKuis']);
+Route::get('/debug/test-store',  [DebugApiController::class, 'testStore']);
+Route::get('/debug/test-api',    [DebugApiController::class, 'testApi']);
+Route::post('/debug/seed',       [DebugApiController::class, 'seed']);
 
 // Protected routes
 Route::middleware(ApiTokenAuth::class)->group(function () {
