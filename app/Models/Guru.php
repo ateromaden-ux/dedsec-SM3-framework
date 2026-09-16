@@ -16,11 +16,13 @@ class Guru extends Authenticatable
     protected $fillable = [
         'email',
         'password',
+        'api_token',
     ];
 
     protected $hidden = [
         'password',
         'remember_token',
+        'api_token',
     ];
 
     protected function casts(): array
